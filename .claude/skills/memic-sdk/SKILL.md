@@ -1,7 +1,22 @@
 ---
 name: memic-sdk
+version: 1.0.0
 description: Context engineering platform for AI agents. Upload documents, search with semantic + structured queries, and inject relevant context into LLM prompts. Supports RAG, Text2SQL, hybrid search, metadata filters, and multi-tenant isolation. Use this skill to integrate Memic into any AI agent, copilot, or application that needs grounded context from documents and databases.
-tags: context-engineering, rag, semantic-search, document-search, text2sql, vector-search, ai-context, llm-context, retrieval-augmented-generation, file-upload, embeddings, multi-tenant, knowledge-base, document-processing, token-optimization, context-compaction, mcp-server, agent-memory, session-context
+homepage: https://app.memic.ai
+metadata:
+  openclaw:
+    emoji: "🧠"
+    primaryEnv: MEMIC_API_KEY
+    requires:
+      env:
+        - MEMIC_API_KEY
+      bins:
+        - python3
+    install:
+      - kind: uv
+        package: memic
+        bins:
+          - python3
 ---
 
 # Memic — Context Engineering SDK
