@@ -2,6 +2,13 @@
 
 Guidelines for AI assistants working on this codebase.
 
+## Golden Rules
+
+1. **NO BREAKING CHANGES** - Never break existing functionality
+2. **ASK FIRST** - Always ask the developer before making changes
+3. **VERSION OVER BREAKING** - Add new versions/methods instead of modifying existing ones
+4. **KISS** - Keep it simple, stupid
+
 ## Package Overview
 
 This is the official Python SDK for the Memic Context Engineering API. It provides:
@@ -23,50 +30,33 @@ memic-python/
     └── test_client.py   # Unit tests
 ```
 
-## Backwards Compatibility Rules
+## No Breaking Changes Policy
 
-### Semantic Versioning
+**NEVER do any of the following:**
+- Remove or rename public functions, classes, or methods
+- Change function signatures (removing params, changing required/optional)
+- Change return types
+- Change exception types thrown by a function
+- Remove or rename dataclass/Pydantic model fields
+- Change default values that alter behavior
 
-- **V0.x**: Breaking changes allowed in MINOR versions (0.1 → 0.2)
-- **V1.0+**: Breaking changes ONLY in MAJOR versions (1.0 → 2.0)
-
-### What IS a Breaking Change
-
-1. Removing or renaming public functions, classes, or methods
-2. Changing function signatures (removing params, changing required/optional)
-3. Changing return types
-4. Changing exception types thrown by a function
-5. Removing or renaming dataclass/Pydantic model fields
-6. Changing default values that alter behavior
-
-### What is NOT Breaking
-
-1. Adding new optional parameters with defaults
-2. Adding new methods, classes, or fields
-3. Bug fixes that match documented behavior
-4. Performance improvements
-5. Adding new exception subclasses
+**Instead, always:**
+- Add new optional parameters with defaults
+- Add new methods alongside existing ones (e.g., `search_v2()`)
+- Add new fields, never remove
+- Deprecate with warnings, remove only after 2+ minor versions
 
 ### Deprecation Process
 
-1. Use `warnings.warn(DeprecationWarning)` with removal version:
-   ```python
-   import warnings
-   warnings.warn(
-       "old_method() is deprecated, use new_method() instead. "
-       "Will be removed in v0.3.0",
-       DeprecationWarning,
-       stacklevel=2
-   )
-   ```
-
-2. Document in CHANGELOG with replacement
-
-3. Minimum deprecation period:
-   - 6 months OR
-   - 2 minor versions (whichever is longer)
-
-4. Add code comment: `# Deprecated: removal in vX.X`
+```python
+import warnings
+warnings.warn(
+    "old_method() is deprecated, use new_method() instead. "
+    "Will be removed in v0.3.0",
+    DeprecationWarning,
+    stacklevel=2
+)
+```
 
 ## Design Principles (KISS)
 
@@ -99,10 +89,66 @@ mypy src/memic/
 4. Update `__init__.py` if new types need exporting
 5. Update CHANGELOG.md
 
-### Releasing a New Version
+## Build & Deploy
 
-1. Update version in `src/memic/_version.py`
-2. Update CHANGELOG.md with changes
-3. Create git tag: `git tag v0.1.0`
-4. Build: `python -m build`
-5. Upload: `twine upload dist/*`
+### Local Development
+
+```bash
+# Install in editable mode with dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/
+
+# Run linter
+ruff check src/
+
+# Run type checker
+mypy src/memic/
+```
+
+### Build Package
+
+```bash
+# Clean previous builds
+rm -rf dist/ build/ *.egg-info
+
+# Build sdist and wheel
+python -m build
+
+# Verify the build
+ls dist/
+# Should show: memic-X.X.X.tar.gz and memic-X.X.X-py3-none-any.whl
+```
+
+### Publish to PyPI
+
+**Pre-release checklist:**
+1. All tests pass: `pytest tests/`
+2. Type check passes: `mypy src/memic/`
+3. Lint passes: `ruff check src/`
+4. Version bumped in `src/memic/_version.py`
+5. CHANGELOG.md updated
+
+**Publish steps:**
+
+```bash
+# 1. Build fresh
+rm -rf dist/ && python -m build
+
+# 2. Upload to TestPyPI first (optional but recommended)
+twine upload --repository testpypi dist/*
+
+# 3. Test install from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ memic
+
+# 4. Upload to production PyPI
+twine upload dist/*
+
+# 5. Tag the release
+git tag v0.X.X
+git push origin v0.X.X
+```
+
+**Required credentials:**
+- PyPI API token in `~/.pypirc` or via `TWINE_USERNAME`/`TWINE_PASSWORD` env vars

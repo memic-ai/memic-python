@@ -8,8 +8,11 @@ Run:
   # Against local backend
   MEMIC_API_KEY=mk_live_... MEMIC_BASE_URL=http://localhost:8000/api/v1 pytest tests/test_integration.py -v
 
+  # Against QA (Pied Piper Inc → Tech companies → production env)
+  MEMIC_API_KEY=mk_live_LiUZIrtv5BCBiLjMkaCkUPBtJtNrjeYkJhf4RivxHEM MEMIC_BASE_URL=https://memic-backend-qa.up.railway.app/api/v1 pytest tests/test_integration.py -v
+
   # Against production
-  MEMIC_API_KEY=mk_live_... pytest tests/test_integration.py -v
+  MEMIC_API_KEY=mk_live_iNNiDnAUdZUAy-Vo47ur5ouTKii6_Oej4LFUwk5VWZM MEMIC_BASE_URL=https://memic-backend-prod.up.railway.app/api/v1 pytest tests/test_integration.py -v
 
 All tests are skipped automatically if MEMIC_API_KEY is not set,
 so running `pytest` in CI without the env var is safe.
