@@ -16,6 +16,7 @@ from .types import (
     FileStatus,
     MetadataFilters,
     Project,
+    Prompt,
     ResultsContainer,
     SearchResult,
     SearchResults,
@@ -483,6 +484,33 @@ class Memic:
             total_results=response.get("total_results", len(semantic_results)),
             search_time_ms=response.get("search_time_ms", 0.0),
         )
+
+    def get_prompt(self, name: str) -> Prompt:
+        """Fetch the live version of a prompt by name.
+
+        Prompts are scoped to the environment your API key belongs to —
+        the same ``name`` can exist independently in staging and production.
+        Returns the currently-live version of the prompt; edits that haven't
+        been promoted are not visible via the SDK.
+
+        Args:
+            name: Unique prompt name within the API key's environment.
+
+        Returns:
+            A :class:`Prompt` with the markdown body and detected variables.
+            Call :meth:`Prompt.render` to substitute values.
+
+        Raises:
+            NotFoundError: If no prompt with that name exists in this
+                environment, or if it exists but has no live version.
+
+        Example:
+            >>> prompt = client.get_prompt("summarizer")
+            >>> message = prompt.render(topic="Memic", lang="en")
+            >>> # pass `message` to your LLM of choice
+        """
+        response = self._request("GET", f"/sdk/prompts/{name}")
+        return Prompt(**response)
 
     def _normalize_file_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
         """Normalize file response fields to match File model."""

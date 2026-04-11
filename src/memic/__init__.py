@@ -10,6 +10,8 @@ from .types import (
     MetadataFilters,
     PageRange,
     Project,
+    Prompt,
+    PromptVariableMissingError,
     ResultsContainer,
     SearchResult,
     SearchResults,
@@ -29,6 +31,7 @@ __all__ = [
     "MetadataFilters",
     "PageRange",
     "Project",
+    "Prompt",
     "ResultsContainer",
     "SearchResult",
     "SearchResults",
@@ -39,4 +42,5 @@ __all__ = [
     "AuthenticationError",
     "NotFoundError",
     "APIError",
+    "PromptVariableMissingError",
 ]

@@ -1,10 +1,14 @@
 """Type definitions for the Memic SDK using Pydantic models."""
 
+import re
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Mapping, Optional
 
 from pydantic import BaseModel, Field
+
+
+_PROMPT_VAR_RE = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 
 class FileStatus(str, Enum):
@@ -249,3 +253,87 @@ class SearchResults(BaseModel):
     def has_documents(self) -> bool:
         """Check if results include document data."""
         return len(self.results.semantic) > 0
+
+
+class PromptVariableMissingError(ValueError):
+    """Raised by Prompt.render() when a {{variable}} has no value.
+
+    Only raised when ``strict=True`` (the default). Pass ``strict=False`` to
+    leave unknown placeholders in the output instead.
+    """
+
+    def __init__(self, variable: str):
+        super().__init__(f"Missing value for prompt variable '{variable}'")
+        self.variable = variable
+
+
+class Prompt(BaseModel):
+    """A versioned markdown prompt fetched from Memic.
+
+    Returned by :meth:`Memic.get_prompt`. Contains the live version of a
+    prompt along with the variable names detected in its body. Use
+    :meth:`render` to substitute values for the ``{{variable}}`` placeholders.
+
+    Example:
+        >>> prompt = client.get_prompt("summarizer")
+        >>> # body: "Summarize {{topic}} in {{lang}}"
+        >>> prompt.variables
+        ['topic', 'lang']
+        >>> prompt.render(topic="Memic", lang="en")
+        'Summarize Memic in en'
+    """
+
+    name: str
+    body: str
+    variables: List[str] = Field(default_factory=list)
+    version_number: int
+    updated_at: Optional[datetime] = None
+
+    def render(self, **values: Any) -> str:
+        """Substitute ``{{variable}}`` placeholders in the body.
+
+        Variables are matched by **name**, not position — order doesn't
+        matter. This mirrors Langfuse's ``prompt.compile(...)`` shape.
+
+        Args:
+            **values: Keyword arguments mapping variable names to values.
+                You can also splat a dict: ``prompt.render(**my_values)``.
+
+        Returns:
+            The rendered string with placeholders replaced.
+
+        Raises:
+            PromptVariableMissingError: If the body contains a
+                ``{{variable}}`` that isn't in ``values``. Call
+                :meth:`render_safe` to keep unknown placeholders instead.
+
+        Example:
+            >>> prompt.render(topic="Memic", lang="en")
+            'Summarize Memic in en'
+        """
+        return self._substitute(values, strict=True)
+
+    def render_safe(self, **values: Any) -> str:
+        """Render without raising on missing variables.
+
+        Unknown ``{{variable}}`` placeholders are left in the output
+        verbatim. Useful when you want a best-effort substitution.
+
+        Args:
+            **values: Keyword arguments mapping variable names to values.
+
+        Returns:
+            The rendered string; unknown placeholders remain as ``{{name}}``.
+        """
+        return self._substitute(values, strict=False)
+
+    def _substitute(self, values: Mapping[str, Any], strict: bool) -> str:
+        def _sub(match: "re.Match[str]") -> str:
+            name = match.group(1)
+            if name in values:
+                return str(values[name])
+            if strict:
+                raise PromptVariableMissingError(name)
+            return match.group(0)
+
+        return _PROMPT_VAR_RE.sub(_sub, self.body)
