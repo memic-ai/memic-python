@@ -16,6 +16,8 @@ from memic import (
     MetadataFilters,
     NotFoundError,
     PageRange,
+    Prompt,
+    PromptVariableMissingError,
     SearchResults,
 )
 
@@ -465,3 +467,107 @@ class TestMetadataFilters:
         assert result["reference_id"] == "TG_G1_Math"
         assert result["page_range"] == {"gte": 1, "lte": 50}
         assert result["category"] == "education"
+
+
+class TestGetPrompt:
+    """Tests for the get_prompt method and Prompt.render helper."""
+
+    @responses.activate
+    def test_get_prompt_success(self, api_key: str, base_url: str) -> None:
+        """get_prompt returns a Prompt object parsed from the API response."""
+        responses.add(
+            responses.GET,
+            f"{base_url}/sdk/prompts/summarizer",
+            json={
+                "name": "summarizer",
+                "body": "Summarize {{topic}} in {{lang}}",
+                "variables": ["topic", "lang"],
+                "version_number": 3,
+                "updated_at": "2026-04-11T10:00:00Z",
+            },
+            status=200,
+        )
+
+        client = Memic(api_key=api_key, base_url=base_url)
+        prompt = client.get_prompt("summarizer")
+
+        assert isinstance(prompt, Prompt)
+        assert prompt.name == "summarizer"
+        assert prompt.body == "Summarize {{topic}} in {{lang}}"
+        assert prompt.variables == ["topic", "lang"]
+        assert prompt.version_number == 3
+
+    @responses.activate
+    def test_get_prompt_not_found(self, api_key: str, base_url: str) -> None:
+        """get_prompt raises NotFoundError when the prompt doesn't exist."""
+        responses.add(
+            responses.GET,
+            f"{base_url}/sdk/prompts/missing",
+            json={"detail": "Prompt 'missing' not found"},
+            status=404,
+        )
+
+        client = Memic(api_key=api_key, base_url=base_url)
+        with pytest.raises(NotFoundError):
+            client.get_prompt("missing")
+
+    def test_prompt_render_with_kwargs(self) -> None:
+        """render substitutes {{variable}} using keyword arguments."""
+        prompt = Prompt(
+            name="summarizer",
+            body="Summarize {{topic}} in {{lang}}",
+            variables=["topic", "lang"],
+            version_number=1,
+        )
+        rendered = prompt.render(topic="Memic", lang="en")
+        assert rendered == "Summarize Memic in en"
+
+    def test_prompt_render_order_independent(self) -> None:
+        """Variables are matched by name, so kwarg order doesn't matter."""
+        prompt = Prompt(
+            name="t",
+            body="{{a}}-{{b}}-{{c}}",
+            variables=["a", "b", "c"],
+            version_number=1,
+        )
+        assert prompt.render(c="3", a="1", b="2") == "1-2-3"
+
+    def test_prompt_render_coerces_values_to_str(self) -> None:
+        """Non-string values are converted to str."""
+        prompt = Prompt(
+            name="t", body="count={{n}}", variables=["n"], version_number=1
+        )
+        assert prompt.render(n=42) == "count=42"
+
+    def test_prompt_render_raises_on_missing(self) -> None:
+        """Strict render raises PromptVariableMissingError for unknown variables."""
+        prompt = Prompt(
+            name="t",
+            body="hi {{name}}",
+            variables=["name"],
+            version_number=1,
+        )
+        with pytest.raises(PromptVariableMissingError) as exc_info:
+            prompt.render()
+        assert exc_info.value.variable == "name"
+
+    def test_prompt_render_safe_leaves_unknown_placeholders(self) -> None:
+        """render_safe preserves unknown {{variable}} placeholders."""
+        prompt = Prompt(
+            name="t",
+            body="hi {{name}}, bye {{other}}",
+            variables=["name", "other"],
+            version_number=1,
+        )
+        assert prompt.render_safe(name="Alice") == "hi Alice, bye {{other}}"
+
+    def test_prompt_render_dict_splat(self) -> None:
+        """Callers can splat a dict into render()."""
+        prompt = Prompt(
+            name="t",
+            body="Summarize {{topic}} in {{lang}}",
+            variables=["topic", "lang"],
+            version_number=1,
+        )
+        values = {"topic": "Memic", "lang": "en"}
+        assert prompt.render(**values) == "Summarize Memic in en"
